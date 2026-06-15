@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "state/StateOptions.h"
+#include "trust/TrustEstimatorOptions.h"
 #include "update/UpdaterOptions.h"
 #include "utils/NoiseManager.h"
 
@@ -138,6 +139,9 @@ struct VioManagerOptions {
   /// Update options for MSCKF features (pixel noise and chi2 multiplier)
   UpdaterOptions msckf_options;
 
+  /// Adaptive trust estimator options
+  TrustEstimatorOptions trust_options;
+
   /// Update options for SLAM features (pixel noise and chi2 multiplier)
   UpdaterOptions slam_options;
 
@@ -173,9 +177,18 @@ struct VioManagerOptions {
       slam_options.sigma_pix_sq = std::pow(slam_options.sigma_pix, 2);
       aruco_options.sigma_pix_sq = std::pow(aruco_options.sigma_pix, 2);
       parser->parse_config("zupt_chi2_multipler", zupt_options.chi2_multipler);
+      parser->parse_config("trust_enable", trust_options.enable);
+      parser->parse_config("trust_log_filepath", trust_options.log_filepath);
+      parser->parse_config("trust_tau", trust_options.tau);
+      parser->parse_config("trust_skip_threshold", trust_options.skip_threshold);
+      parser->parse_config("trust_eps", trust_options.eps);
+      parser->parse_config("trust_r_max_multiplier", trust_options.r_max_multiplier);
+      parser->parse_config("trust_grid_size", trust_options.grid_size);
     }
     PRINT_DEBUG("  Updater MSCKF Feats:\n");
     msckf_options.print();
+    PRINT_DEBUG("  Trust Estimator:\n");
+    trust_options.print();
     PRINT_DEBUG("  Updater SLAM Feats:\n");
     slam_options.print();
     PRINT_DEBUG("  Updater ARUCO Tags:\n");

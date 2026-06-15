@@ -107,7 +107,7 @@ up_aruco_sigma_px: 1
 up_aruco_chi2_multipler: 1
 
 # adaptive trust estimator (disabled by default — use config euroc_mav_trust)
-trust_enable: false
+trust_enable: true
 trust_log_filepath: "/tmp/trust_log.csv"
 trust_tau: 5.0
 trust_skip_threshold: 0.15

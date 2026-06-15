@@ -152,7 +152,7 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
   initializer = std::make_shared<ov_init::InertialInitializer>(params.init_options, trackFEATS->get_feature_database());
 
   // Make the updater!
-  updaterMSCKF = std::make_shared<UpdaterMSCKF>(params.msckf_options, params.featinit_options);
+  updaterMSCKF = std::make_shared<UpdaterMSCKF>(params.msckf_options, params.featinit_options, params.trust_options);
   updaterSLAM = std::make_shared<UpdaterSLAM>(params.slam_options, params.aruco_options, params.featinit_options);
 
   // If we are using zero velocity updates, then create the updater

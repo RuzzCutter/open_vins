@@ -27,6 +27,7 @@
 #include "feat/FeatureInitializer.h"
 #include "state/State.h"
 #include "state/StateHelper.h"
+#include "trust/TrustEstimator.h"
 #include "types/LandmarkRepresentation.h"
 #include "utils/colors.h"
 #include "utils/print.h"
@@ -39,7 +40,9 @@ using namespace ov_core;
 using namespace ov_type;
 using namespace ov_msckf;
 
-UpdaterMSCKF::UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerOptions &feat_init_options) : _options(options) {
+UpdaterMSCKF::UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerOptions &feat_init_options,
+                           TrustEstimatorOptions &trust_options)
+    : _options(options), _trust_options(trust_options) {
 
   // Save our raw pixel noise squared
   _options.sigma_pix_sq = std::pow(_options.sigma_pix, 2);
@@ -47,12 +50,22 @@ UpdaterMSCKF::UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerO
   // Save our feature initializer
   initializer_feat = std::shared_ptr<ov_core::FeatureInitializer>(new ov_core::FeatureInitializer(feat_init_options));
 
+  if (_trust_options.enable) {
+    _trust = std::make_shared<TrustEstimator>(_trust_options);
+  }
+
   // Initialize the chi squared test table with confidence level 0.95
   // https://github.com/KumarRobotics/msckf_vio/blob/050c50defa5a7fd9a04c1eed5687b405f02919b5/src/msckf_vio.cpp#L215-L221
   for (int i = 1; i < 500; i++) {
     boost::math::chi_squared chi_squared_dist(i);
     chi_squared_table[i] = boost::math::quantile(chi_squared_dist, 0.95);
   }
+}
+
+const TrustMetrics *UpdaterMSCKF::get_last_trust_metrics() const {
+  if (!_has_last_trust)
+    return nullptr;
+  return &_last_trust;
 }
 
 void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_ptr<Feature>> &feature_vec) {
@@ -165,6 +178,11 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   size_t ct_jacob = 0;
   size_t ct_meas = 0;
 
+  const size_t n_features_total = feature_vec.size();
+  int n_inliers = 0;
+  double sum_repr_error = 0.0;
+  std::vector<Eigen::Vector2f> inlier_uvs;
+
   // 4. Compute linear system for each feature, nullspace project, and reject
   auto it2 = feature_vec.begin();
   while (it2 != feature_vec.end()) {
@@ -233,6 +251,24 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
       continue;
     }
 
+    n_inliers++;
+    if (res.rows() > 0) {
+      sum_repr_error += res.norm() / std::sqrt(static_cast<double>(res.rows()));
+    }
+    if (!(*it2)->uvs.empty()) {
+      size_t cam_id = 0;
+      if ((*it2)->uvs.find(0) != (*it2)->uvs.end()) {
+        cam_id = 0;
+      } else {
+        cam_id = (*it2)->uvs.begin()->first;
+      }
+      const auto &uv_list = (*it2)->uvs.at(cam_id);
+      if (!uv_list.empty()) {
+        const auto &uv = uv_list.back();
+        inlier_uvs.emplace_back(uv(0), uv(1));
+      }
+    }
+
     // We are good!!! Append to our large H vector
     size_t ct_hx = 0;
     for (const auto &var : Hx_order) {
@@ -271,6 +307,41 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   res_big.conservativeResize(ct_meas, 1);
   Hx_big.conservativeResize(ct_meas, ct_jacob);
 
+  double sigma_pix_sq_effective = _options.sigma_pix_sq;
+  if (_trust != nullptr) {
+    double e_repr = (n_inliers > 0) ? sum_repr_error / static_cast<double>(n_inliers) : 0.0;
+
+    int img_w = 752;
+    int img_h = 480;
+    if (!state->_cam_intrinsics_cameras.empty()) {
+      const auto &cam0 = state->_cam_intrinsics_cameras.begin()->second;
+      img_w = cam0->w();
+      img_h = cam0->h();
+    }
+
+    double tr_pose = 0.0;
+    if (!state->_clones_IMU.empty()) {
+      std::vector<std::shared_ptr<Type>> pose_order;
+      pose_order.push_back(state->_clones_IMU.rbegin()->second);
+      Eigen::MatrixXd P_pose = StateHelper::get_marginal_covariance(state, pose_order);
+      tr_pose = P_pose.trace();
+    }
+
+    TrustMetrics trust = _trust->compute(static_cast<int>(n_features_total), n_inliers, e_repr, inlier_uvs, img_w, img_h, tr_pose);
+    _last_trust = trust;
+    _has_last_trust = true;
+    _trust->log(state->_timestamp, trust);
+
+    PRINT_INFO("[trust]: c=%.3f f1=%.3f f2=%.3f f3=%.3f f4=%.3f inliers=%d/%zu skip=%d scale=%.2f\n", trust.c, trust.f1,
+               trust.f2, trust.f3, trust.f4, trust.n_inliers, n_features_total, trust.skip_update ? 1 : 0, trust.noise_scale);
+
+    if (trust.skip_update) {
+      return;
+    }
+
+    sigma_pix_sq_effective = _options.sigma_pix_sq * trust.noise_scale;
+  }
+
   // 5. Perform measurement compression
   UpdaterHelper::measurement_compress_inplace(Hx_big, res_big);
   if (Hx_big.rows() < 1) {
@@ -279,7 +350,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   rT4 = boost::posix_time::microsec_clock::local_time();
 
   // Our noise is isotropic, so make it here after our compression
-  Eigen::MatrixXd R_big = _options.sigma_pix_sq * Eigen::MatrixXd::Identity(res_big.rows(), res_big.rows());
+  Eigen::MatrixXd R_big = sigma_pix_sq_effective * Eigen::MatrixXd::Identity(res_big.rows(), res_big.rows());
 
   // 6. With all good features update the state
   StateHelper::EKFUpdate(state, Hx_order_big, Hx_big, res_big, R_big);

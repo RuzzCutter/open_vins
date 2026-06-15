@@ -27,6 +27,8 @@
 
 #include "feat/FeatureInitializerOptions.h"
 
+#include "trust/TrustEstimator.h"
+#include "trust/TrustEstimatorOptions.h"
 #include "UpdaterOptions.h"
 
 namespace ov_core {
@@ -57,7 +59,8 @@ public:
    * @param options Updater options (include measurement noise value)
    * @param feat_init_options Feature initializer options
    */
-  UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerOptions &feat_init_options);
+  UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerOptions &feat_init_options,
+               TrustEstimatorOptions &trust_options);
 
   /**
    * @brief Given tracked features, this will try to use them to update the state.
@@ -66,6 +69,9 @@ public:
    * @param feature_vec Features that can be used for update
    */
   void update(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec);
+
+  /// Last trust metrics (valid when trust estimator enabled)
+  const TrustMetrics *get_last_trust_metrics() const;
 
 protected:
   /// Options used during update
@@ -76,6 +82,12 @@ protected:
 
   /// Chi squared 95th percentile table (lookup would be size of residual)
   std::map<int, double> chi_squared_table;
+
+  /// Adaptive measurement trust (optional)
+  TrustEstimatorOptions _trust_options;
+  std::shared_ptr<TrustEstimator> _trust;
+  TrustMetrics _last_trust;
+  bool _has_last_trust = false;
 };
 
 } // namespace ov_msckf
