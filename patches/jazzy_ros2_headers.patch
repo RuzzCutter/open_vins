@@ -1,0 +1,3 @@
+# Local patch: ROS 2 Jazzy header paths (upstream PR #500 not merged yet)
+# Files: ov_msckf/src/ros/ROS2Visualizer.h, ROSVisualizerHelper.h
+# Applied: 2026-06-15

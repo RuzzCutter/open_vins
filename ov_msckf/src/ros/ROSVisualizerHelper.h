@@ -33,8 +33,16 @@
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
+#if __has_include(<tf2/convert.hpp>)
+#include <tf2/convert.hpp>
+#else
 #include <tf2/transform_datatypes.h>
+#endif
+#if __has_include(<tf2_geometry_msgs/tf2_geometry_msgs.hpp>)
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#else
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#endif
 #endif
 
 namespace ov_type {
