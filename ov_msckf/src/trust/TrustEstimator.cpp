@@ -43,7 +43,8 @@ TrustMetrics TrustEstimator::compute(int n_features, int n_inliers, double e_rep
   m.f3 = static_cast<double>(filled) / static_cast<double>(cells);
 
   const double tau = std::max(1e-6, _options.tau);
-  m.f4 = std::exp(-tr_pose / tau);
+  const double tr_clamped = std::min(tr_pose, 10.0 * tau);
+  m.f4 = std::exp(-tr_clamped / tau);
 
   m.c = clip(0.25 * (m.f1 + m.f2 + m.f3 + m.f4), 0.05, 1.0);
 

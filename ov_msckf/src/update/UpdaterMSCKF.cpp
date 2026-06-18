@@ -324,7 +324,8 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
       std::vector<std::shared_ptr<Type>> pose_order;
       pose_order.push_back(state->_clones_IMU.rbegin()->second);
       Eigen::MatrixXd P_pose = StateHelper::get_marginal_covariance(state, pose_order);
-      tr_pose = P_pose.trace();
+      // Position block only (orientation variance dominates trace and collapses f4)
+      tr_pose = P_pose.block<3, 3>(3, 3).trace();
     }
 
     TrustMetrics trust = _trust->compute(static_cast<int>(n_features_total), n_inliers, e_repr, inlier_uvs, img_w, img_h, tr_pose);
