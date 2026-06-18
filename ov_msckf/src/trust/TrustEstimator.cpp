@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 
 namespace ov_msckf {
 
@@ -98,9 +99,10 @@ void TrustEstimator::log(double timestamp, const TrustMetrics &metrics) {
     _log_header_written = true;
   }
 
-  _log << timestamp << "," << metrics.f1 << "," << metrics.f2 << "," << metrics.f3 << "," << metrics.f4 << "," << metrics.c << ","
-       << metrics.n_features << "," << metrics.n_inliers << "," << metrics.e_repr << "," << metrics.tr_pose << ","
-       << (metrics.skip_update ? 1 : 0) << "," << metrics.noise_scale << "\n";
+  _log << std::fixed << std::setprecision(9) << timestamp << "," << metrics.f1 << "," << metrics.f2 << "," << metrics.f3
+       << "," << metrics.f4 << "," << metrics.c << "," << metrics.n_features << "," << metrics.n_inliers << ","
+       << metrics.e_repr << "," << metrics.tr_pose << "," << (metrics.skip_update ? 1 : 0) << "," << metrics.noise_scale
+       << "\n";
   _log.flush();
 }
 
