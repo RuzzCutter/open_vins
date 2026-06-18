@@ -114,6 +114,10 @@ trust_skip_threshold: 0.15
 trust_eps: 0.05
 trust_r_max_multiplier: 100.0
 trust_grid_size: 8
+trust_use_f1: true
+trust_use_f2: true
+trust_use_f3: true
+trust_use_f4: true
 
 # masks for our images
 use_mask: false

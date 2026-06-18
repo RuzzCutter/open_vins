@@ -46,7 +46,29 @@ TrustMetrics TrustEstimator::compute(int n_features, int n_inliers, double e_rep
   const double tr_clamped = std::min(tr_pose, 10.0 * tau);
   m.f4 = std::exp(-tr_clamped / tau);
 
-  m.c = clip(0.25 * (m.f1 + m.f2 + m.f3 + m.f4), 0.05, 1.0);
+  double sum = 0.0;
+  int n_active = 0;
+  if (_options.use_f1) {
+    sum += m.f1;
+    n_active++;
+  }
+  if (_options.use_f2) {
+    sum += m.f2;
+    n_active++;
+  }
+  if (_options.use_f3) {
+    sum += m.f3;
+    n_active++;
+  }
+  if (_options.use_f4) {
+    sum += m.f4;
+    n_active++;
+  }
+  if (n_active > 0) {
+    m.c = clip(sum / static_cast<double>(n_active), 0.05, 1.0);
+  } else {
+    m.c = 1.0;
+  }
 
   const double denom = m.c + _options.eps;
   m.noise_scale = 1.0 / denom;

@@ -184,6 +184,10 @@ struct VioManagerOptions {
       parser->parse_config("trust_eps", trust_options.eps);
       parser->parse_config("trust_r_max_multiplier", trust_options.r_max_multiplier);
       parser->parse_config("trust_grid_size", trust_options.grid_size);
+      parser->parse_config("trust_use_f1", trust_options.use_f1);
+      parser->parse_config("trust_use_f2", trust_options.use_f2);
+      parser->parse_config("trust_use_f3", trust_options.use_f3);
+      parser->parse_config("trust_use_f4", trust_options.use_f4);
     }
     PRINT_DEBUG("  Updater MSCKF Feats:\n");
     msckf_options.print();
